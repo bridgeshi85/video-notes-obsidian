@@ -1,0 +1,21 @@
+{
+  "name": "video-notes-obsidian",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BYOK 视频学习笔记 Chrome 插件：提取 Udemy 字幕 → LLM 生成中文笔记 → 写入 Obsidian",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^3.0.0",
+    "@types/chrome": "^0.1.0",
+    "typescript": "~5.9.3",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.0"
+  }
+}

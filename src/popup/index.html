@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Video Notes</title>
+    <link rel="stylesheet" href="../shared/ui.css" />
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <header class="row">
+      <h1>📺 Video Notes</h1>
+      <span class="spacer"></span>
+      <button id="open-options" title="设置">⚙️ 设置</button>
+    </header>
+
+    <div id="config-warning" class="msg warn hidden">
+      尚未配置 LLM API Key。<a href="#" id="config-link">前往设置</a>
+    </div>
+    <div id="message" class="msg hidden"></div>
+
+    <!-- 读取中 -->
+    <section id="view-loading" class="hidden">
+      <p class="muted"><span class="spinner"></span> <span id="loading-text">正在读取字幕…</span></p>
+    </section>
+
+    <!-- 字幕预览 → 确认生成 -->
+    <section id="view-preview" class="hidden">
+      <div class="grid">
+        <div>
+          <label for="meta-course">课程</label>
+          <input id="meta-course" />
+        </div>
+        <div class="grid-2">
+          <div>
+            <label for="meta-index">序号</label>
+            <input id="meta-index" placeholder="可空" />
+          </div>
+          <div>
+            <label for="meta-lecture">节标题</label>
+            <input id="meta-lecture" />
+          </div>
+        </div>
+      </div>
+      <p class="muted" id="preview-stats"></p>
+      <blockquote id="preview-text"></blockquote>
+      <div class="row">
+        <button id="btn-generate" class="primary">✨ 生成笔记</button>
+        <button id="btn-reextract">重新提取</button>
+      </div>
+    </section>
+
+    <!-- .vtt 兜底 -->
+    <section id="view-drop" class="hidden">
+      <label id="dropzone" class="dropzone" for="file-input">
+        或将 <b>.vtt / .srt</b> 字幕文件拖到这里（点击选择）
+        <input id="file-input" type="file" accept=".vtt,.srt,text/vtt" hidden />
+      </label>
+    </section>
+
+    <!-- 生成中 -->
+    <section id="view-progress" class="hidden">
+      <p><span class="spinner"></span> <span id="progress-text">正在生成…</span></p>
+      <progress id="progress-bar" max="1" value="0"></progress>
+      <p class="muted">可以关闭此窗口，生成会在后台继续。</p>
+    </section>
+
+    <!-- 结果 -->
+    <section id="view-result" class="hidden">
+      <p class="muted" id="result-title"></p>
+      <textarea id="note" rows="16" spellcheck="false"></textarea>
+      <div id="overwrite-confirm" class="msg warn hidden">
+        <div>已存在同名笔记：<code id="overwrite-path"></code></div>
+        <div class="row" style="margin-top: 6px">
+          <button id="btn-overwrite" class="primary">覆盖</button>
+          <button id="btn-overwrite-cancel">取消</button>
+        </div>
+      </div>
+      <div class="row">
+        <button id="btn-save" class="primary">💾 保存到 Obsidian</button>
+        <button id="btn-download">⬇️ 下载 .md</button>
+        <button id="btn-copy">复制</button>
+        <button id="btn-new">处理当前页</button>
+      </div>
+    </section>
+
+    <!-- 失败 -->
+    <section id="view-error" class="hidden">
+      <div id="partial-wrap" class="hidden">
+        <p class="muted">已生成的部分：</p>
+        <textarea id="partial" rows="10" readonly></textarea>
+      </div>
+      <div class="row">
+        <button id="btn-retry" class="primary">重试</button>
+        <button id="btn-copy-partial" class="hidden">复制已生成部分</button>
+        <button id="btn-new-2">处理当前页</button>
+      </div>
+    </section>
+
+    <script type="module" src="./popup.ts"></script>
+  </body>
+</html>

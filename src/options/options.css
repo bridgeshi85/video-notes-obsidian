@@ -1,0 +1,15 @@
+body { padding: 24px 16px 48px; background: var(--bg-soft); }
+main { max-width: 720px; margin: 0 auto; }
+main > h1 { font-size: 20px; margin-bottom: 16px; }
+.card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 560px) { .grid-3 { grid-template-columns: 1fr; } }
+.actions { margin-top: 12px; }
+.radios { gap: 16px; }
+.radio { display: flex; align-items: center; gap: 6px; color: var(--fg); font-size: 13px; margin: 0; }
+.radio input { width: auto; }
+.sticky { position: sticky; bottom: 0; padding: 12px 0; background: var(--bg-soft); margin-bottom: 16px; }
+.history { list-style: none; padding: 0; margin: 0; }
+.history li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.history li:last-child { border-bottom: none; }
+a { color: var(--accent); }
