@@ -1,7 +1,8 @@
 import { cleanTranscript, countChars } from '../shared/clean';
 import { getPreset } from '../shared/config';
 import type { BackgroundRequest, Broadcast, ContentRequest, ExtractResponse } from '../shared/messages';
-import { getSecrets, getSettings } from '../shared/storage';
+import { buildNotePaths, buildTranscriptNote } from '../shared/note';
+import { addHistory, getChatSession, getSecrets, getSettings, saveChatSession } from '../shared/storage';
 import type { Job, LectureMeta, SyncSettings, Transcript } from '../shared/types';
 import { parseSubtitleLines } from '../shared/vtt';
 
@@ -13,6 +14,8 @@ type View = (typeof VIEWS)[number];
 let settings: SyncSettings;
 let transcript: Transcript | undefined;
 let activeTabId: number | undefined;
+let activeWindowId: number | undefined;
+let activeTabUrl: string | undefined;
 
 function show(...views: View[]) {
   for (const v of VIEWS) $(v).classList.toggle('hidden', !views.includes(v));
@@ -29,7 +32,15 @@ function clearMessage() {
 }
 
 async function send<T = Record<string, unknown>>(msg: BackgroundRequest): Promise<({ ok: true } & T) | { ok: false; error: string }> {
-  return chrome.runtime.sendMessage(msg);
+  try {
+    const res = await chrome.runtime.sendMessage(msg);
+    if (!res || typeof res !== 'object' || !('ok' in res)) {
+      return { ok: false, error: '后台服务未响应，请在扩展管理页重新加载插件后重试。' };
+    }
+    return res as ({ ok: true } & T) | { ok: false; error: string };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message || '与后台通信失败。' };
+  }
 }
 
 // ---------- 字幕获取 ----------
@@ -47,6 +58,8 @@ async function extractFromPage() {
   clearMessage();
   const tab = await getActiveTab();
   activeTabId = tab?.id;
+  activeWindowId = tab?.windowId;
+  activeTabUrl = tab?.url;
   if (!tab?.id || !isUdemyLearnUrl(tab.url)) {
     message('请在 Udemy 课程播放页使用本插件，或拖入 .vtt 字幕文件。', 'warn');
     show('view-drop');
@@ -120,9 +133,8 @@ function showPreview(t: Transcript) {
   show('view-preview', 'view-drop');
 }
 
-async function generate() {
-  if (!transcript) return;
-  clearMessage();
+function readPreviewMeta(): LectureMeta | undefined {
+  if (!transcript) return undefined;
   const meta: LectureMeta = {
     ...transcript.meta,
     course: $<HTMLInputElement>('meta-course').value.trim() || transcript.meta.course,
@@ -130,12 +142,57 @@ async function generate() {
     lecture: $<HTMLInputElement>('meta-lecture').value.trim() || transcript.meta.lecture,
   };
   transcript = { ...transcript, meta };
+  return meta;
+}
+
+async function generate() {
+  if (!transcript || !readPreviewMeta()) return;
+  clearMessage();
   const res = await send<{ job: Job }>({ type: 'GENERATE', transcript });
   if (!res.ok) {
     message(res.error);
     return;
   }
   renderJob(res.job);
+}
+
+async function downloadMarkdownFile(filename: string, content: string): Promise<string> {
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  try {
+    await chrome.downloads.download({ url, filename, conflictAction: 'overwrite', saveAs: false });
+    return `下载目录/${filename}`;
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+}
+
+async function saveTranscript(mode: 'rest' | 'download') {
+  if (!transcript || !readPreviewMeta()) return;
+  clearMessage();
+  try {
+    if (mode === 'download') {
+      const suffix = '-transcript';
+      const paths = buildNotePaths(transcript.meta, 'VideoNotes/Udemy', suffix);
+      const note = buildTranscriptNote(transcript.meta, transcript.text, paths);
+      const path = await downloadMarkdownFile(paths.notePath, note);
+      await addHistory({
+        course: transcript.meta.course,
+        lecture: `${transcript.meta.lecture} (字幕)`,
+        url: transcript.meta.url,
+        time: Date.now(),
+        status: 'saved',
+        path,
+      });
+      message(`✅ 字幕已下载：${path}`, 'ok');
+      return;
+    }
+    const res = await send<{ path: string }>({ type: 'SAVE_TRANSCRIPT', transcript, mode });
+    if (res?.ok) message(`✅ 字幕已保存：${res.path}`, 'ok');
+    else message(res?.error ?? '保存失败，请重载插件后重试。');
+  } catch (e) {
+    message((e as Error).message || '保存失败');
+  }
 }
 
 // ---------- 任务状态 ----------
@@ -184,6 +241,23 @@ async function clearJobAndRestart() {
 async function save(mode: 'rest' | 'download', skipExistCheck = false) {
   clearMessage();
   const note = $<HTMLTextAreaElement>('note').value;
+  if (mode === 'download') {
+    try {
+      const jobRes = await send<{ job?: Job }>({ type: 'GET_JOB' });
+      const meta = (jobRes.ok && jobRes.job?.meta) || transcript?.meta;
+      if (!meta) {
+        message('没有可保存的笔记元数据。');
+        return;
+      }
+      const paths = buildNotePaths(meta, 'VideoNotes/Udemy');
+      const path = await downloadMarkdownFile(paths.notePath, note);
+      await addHistory({ course: meta.course, lecture: meta.lecture, url: meta.url, time: Date.now(), status: 'saved', path });
+      message(`✅ 已下载：${path}`, 'ok');
+    } catch (e) {
+      message((e as Error).message || '下载失败');
+    }
+    return;
+  }
   if (mode === 'rest' && !skipExistCheck) {
     const check = await send<{ exists: boolean; path: string }>({ type: 'CHECK_EXISTS' });
     if (!check.ok) {
@@ -216,8 +290,41 @@ function bindEvents() {
   };
   $('open-options').addEventListener('click', openOptions);
   $('config-link').addEventListener('click', openOptions);
+  $('open-sidepanel').addEventListener('click', () => {
+    try {
+      if (transcript) {
+        readPreviewMeta();
+        const urlKey = transcript.meta.url || activeTabUrl || 'default';
+        const t = transcript;
+        void getChatSession(urlKey).then((session) => saveChatSession(urlKey, { ...session, transcript: t }));
+      }
+      if (!chrome.sidePanel?.open) {
+        // 若尚未授权 sidePanel 权限或当前浏览器环境不支持 sidePanel API，降级在新标签页打开对话面板
+        void chrome.tabs.create({ url: chrome.runtime.getURL('src/sidepanel/index.html') });
+        window.close();
+        return;
+      }
+      const openPromise = activeTabId
+        ? chrome.sidePanel.open({ tabId: activeTabId })
+        : activeWindowId
+          ? chrome.sidePanel.open({ windowId: activeWindowId })
+          : undefined;
+      if (!openPromise) {
+        void chrome.tabs.create({ url: chrome.runtime.getURL('src/sidepanel/index.html') });
+        window.close();
+        return;
+      }
+      openPromise
+        .then(() => window.close())
+        .catch((e: unknown) => message((e as Error).message || '打开侧边栏失败'));
+    } catch (e) {
+      message((e as Error).message || '打开侧边栏失败');
+    }
+  });
 
   $('btn-generate').addEventListener('click', () => void generate());
+  $('btn-download-transcript').addEventListener('click', () => void saveTranscript('download'));
+  $('btn-save-transcript').addEventListener('click', () => void saveTranscript('rest'));
   $('btn-reextract').addEventListener('click', () => void extractFromPage());
   $('btn-save').addEventListener('click', () => void save(settings.obsidian.mode));
   $('btn-download').addEventListener('click', () => void save('download'));
@@ -264,12 +371,15 @@ async function init() {
   settings = s;
   $('btn-save').textContent = settings.obsidian.mode === 'rest' ? '💾 保存到 Obsidian' : '💾 保存（下载）';
   $('btn-download').classList.toggle('hidden', settings.obsidian.mode === 'download');
+  $('btn-save-transcript').classList.toggle('hidden', settings.obsidian.mode !== 'rest');
   if (getPreset(settings.llm.provider).needsKey && !secrets.llmApiKey) {
     $('config-warning').classList.remove('hidden');
   }
 
   const tab = await getActiveTab();
   activeTabId = tab?.id;
+  activeWindowId = tab?.windowId;
+  activeTabUrl = tab?.url;
 
   const res = await send<{ job?: Job }>({ type: 'GET_JOB' });
   if (res.ok && res.job) {

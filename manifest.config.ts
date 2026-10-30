@@ -15,6 +15,9 @@ export default defineManifest({
     default_popup: 'src/popup/index.html',
     default_title: 'Video Notes',
   },
+  side_panel: {
+    default_path: 'src/sidepanel/index.html',
+  },
   options_page: 'src/options/index.html',
   background: {
     service_worker: 'src/background/index.ts',
@@ -27,7 +30,7 @@ export default defineManifest({
       run_at: 'document_idle',
     },
   ],
-  permissions: ['storage', 'activeTab', 'downloads'],
+  permissions: ['storage', 'activeTab', 'downloads', 'sidePanel'],
   host_permissions: [
     '*://*.udemy.com/*',
     'http://localhost:11434/*',

@@ -1,9 +1,10 @@
 import { splitIntoChunks } from '../shared/chunk';
 import { renderTemplate } from '../shared/config';
-import type { LectureMeta, LlmConfig, PromptConfig } from '../shared/types';
+import type { ChatMessage, ChatTurn, LectureMeta, LlmConfig, PromptConfig, Transcript } from '../shared/types';
 
 const REQUEST_TIMEOUT_MS = 180_000;
 const MAX_RATE_LIMIT_RETRIES = 5;
+const MAX_CHAT_HISTORY_TURNS = 10;
 const SYSTEM_PROMPT = '你是严谨的中文技术学习笔记助手，始终使用简体中文输出。';
 
 export class LlmError extends Error {
@@ -32,10 +33,23 @@ function isContextLengthError(status: number | undefined, message: string): bool
   return (status === 400 || status === 413) && /context|maximum|too long|token|length/i.test(message);
 }
 
-async function chatOnce(cfg: LlmConfig, apiKey: string, prompt: string, maxTokens = cfg.maxTokens): Promise<string> {
+async function chatOnce(
+  cfg: LlmConfig,
+  apiKey: string,
+  promptOrMessages: string | ChatMessage[],
+  maxTokens = cfg.maxTokens,
+): Promise<string> {
   if (!cfg.baseUrl) throw new LlmError('未配置 LLM 端点，请在设置页填写 baseUrl。');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+  const messages: ChatMessage[] =
+    typeof promptOrMessages === 'string'
+      ? [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: promptOrMessages },
+        ]
+      : promptOrMessages;
 
   let res: Response;
   try {
@@ -45,10 +59,7 @@ async function chatOnce(cfg: LlmConfig, apiKey: string, prompt: string, maxToken
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       body: JSON.stringify({
         model: cfg.modelName,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: prompt },
-        ],
+        messages,
         temperature: cfg.temperature,
         max_tokens: maxTokens,
         stream: false,
@@ -85,12 +96,17 @@ async function chatOnce(cfg: LlmConfig, apiKey: string, prompt: string, maxToken
 }
 
 /** 带重试的调用：429 指数退避；其他错误重试 1 次；上下文超长不重试 */
-export async function chat(cfg: LlmConfig, apiKey: string, prompt: string, maxTokens?: number): Promise<string> {
+export async function chat(
+  cfg: LlmConfig,
+  apiKey: string,
+  promptOrMessages: string | ChatMessage[],
+  maxTokens?: number,
+): Promise<string> {
   let rateLimitRetries = 0;
   let otherRetries = 0;
   for (;;) {
     try {
-      return await chatOnce(cfg, apiKey, prompt, maxTokens);
+      return await chatOnce(cfg, apiKey, promptOrMessages, maxTokens);
     } catch (e) {
       if (!(e instanceof LlmError)) throw e;
       if (isContextLengthError(e.status, e.message)) {
@@ -169,4 +185,42 @@ export async function generateNoteBody(input: GenerateInput, onProgress: (p: Pro
   } catch (e) {
     throw new GenerateError(`汇总笔记失败：${(e as Error).message}`, allPoints);
   }
+}
+
+export interface ChatWithTranscriptInput {
+  transcript: Transcript;
+  history: ChatTurn[];
+  question: string;
+  llm: LlmConfig;
+  apiKey: string;
+}
+
+/** 基于当前课程字幕的多轮对话问答（按 chunkTokens * 2 截断超长字幕保护上下文） */
+export async function chatWithTranscript(input: ChatWithTranscriptInput): Promise<string> {
+  const { transcript, history, question, llm, apiKey } = input;
+  const maxContextTokens = Math.max(2000, llm.chunkTokens * 2);
+  const chunks = splitIntoChunks(transcript.text, maxContextTokens);
+  const contextText = chunks[0] ?? '';
+  const truncatedHint = chunks.length > 1 ? '\n\n（注：字幕较长，已截取前段核心内容作为上下文）' : '';
+
+  const systemContent = [
+    SYSTEM_PROMPT,
+    '请围绕以下课程字幕回答用户的问题。如果问题超出字幕范围，可结合你的专业知识补充说明，但需注明哪些是课程原意、哪些是补充。',
+    `课程：${transcript.meta.course}`,
+    `小节：${transcript.meta.lecture}`,
+    `--- 课程字幕开始 ---\n${contextText}${truncatedHint}\n--- 课程字幕结束 ---`,
+  ].join('\n');
+
+  const recentHistory = history.slice(-MAX_CHAT_HISTORY_TURNS).map<ChatMessage>((t) => ({
+    role: t.role,
+    content: t.content,
+  }));
+
+  const messages: ChatMessage[] = [
+    { role: 'system', content: systemContent },
+    ...recentHistory,
+    { role: 'user', content: question },
+  ];
+
+  return chat(llm, apiKey, messages);
 }

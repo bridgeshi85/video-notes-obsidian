@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { chat, GenerateError, generateNoteBody } from '../src/background/llm';
+import { chat, chatWithTranscript, GenerateError, generateNoteBody } from '../src/background/llm';
 import { DEFAULT_LLM, DEFAULT_PROMPTS } from '../src/shared/config';
-import type { LectureMeta } from '../src/shared/types';
+import type { LectureMeta, Transcript } from '../src/shared/types';
 
 const meta: LectureMeta = {
   course: 'C',
@@ -119,5 +119,39 @@ describe('generateNoteBody', () => {
     expect(err).toBeInstanceOf(GenerateError);
     expect((err as GenerateError).partial).toContain('POINT-1');
     expect((err as GenerateError).message).toMatch(/第 2\/\d+ 段/);
+  });
+});
+
+describe('chatWithTranscript', () => {
+  const transcript: Transcript = {
+    meta,
+    text: 'Docker containers share the host OS kernel.',
+    charCount: 43,
+    source: 'dom',
+  };
+
+  it('将字幕注入 system prompt 并携带多轮历史与当前问题', async () => {
+    const fetch = vi.fn().mockResolvedValue(reply('因为共享宿主机内核'));
+    vi.stubGlobal('fetch', fetch);
+
+    const ans = await chatWithTranscript({
+      transcript,
+      history: [
+        { role: 'user', content: '上一轮问题' },
+        { role: 'assistant', content: '上一轮回答' },
+      ],
+      question: '为什么容器比虚拟机轻？',
+      llm: DEFAULT_LLM,
+      apiKey: 'k',
+    });
+
+    expect(ans).toBe('因为共享宿主机内核');
+    const sent = JSON.parse(fetch.mock.calls[0][1].body as string);
+    expect(sent.messages).toHaveLength(4);
+    expect(sent.messages[0].role).toBe('system');
+    expect(sent.messages[0].content).toContain('Docker containers share the host OS kernel.');
+    expect(sent.messages[1]).toEqual({ role: 'user', content: '上一轮问题' });
+    expect(sent.messages[2]).toEqual({ role: 'assistant', content: '上一轮回答' });
+    expect(sent.messages[3]).toEqual({ role: 'user', content: '为什么容器比虚拟机轻？' });
   });
 });

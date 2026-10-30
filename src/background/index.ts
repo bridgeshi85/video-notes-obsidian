@@ -1,8 +1,8 @@
 import type { BackgroundRequest, Broadcast } from '../shared/messages';
-import { buildNote, buildNotePaths } from '../shared/note';
+import { buildNote, buildNotePaths, buildTranscriptNote } from '../shared/note';
 import { addHistory, getJob, getSecrets, getSettings, setJob } from '../shared/storage';
 import type { Job, Transcript } from '../shared/types';
-import { chat, GenerateError, generateNoteBody } from './llm';
+import { chat, chatWithTranscript, GenerateError, generateNoteBody } from './llm';
 import { downloadNote, noteExists, saveToObsidian, testObsidian } from './obsidian';
 
 let running = false;
@@ -38,7 +38,7 @@ async function runJob(job: Job, transcript: Transcript): Promise<void> {
       (p) => void updateJob({ ...job, stage: p.stage, done: p.done, total: p.total }),
     );
     const paths = buildNotePaths(transcript.meta, settings.obsidian.baseFolder);
-    const note = buildNote(transcript.meta, body, paths);
+    const note = buildNote(transcript.meta, body, transcript.text, paths);
     const latest = (await getJob()) ?? job;
     await updateJob({ ...latest, stage: 'done', note, done: latest.total, finishedAt: Date.now() });
     await addHistory({ course: job.meta.course, lecture: job.meta.lecture, url: job.meta.url, time: Date.now(), status: 'generated' });
@@ -75,6 +75,23 @@ async function handle(msg: BackgroundRequest): Promise<unknown> {
       return { ok: true, job };
     }
 
+    case 'CHAT': {
+      const stop = keepAlive();
+      try {
+        const [{ llm }, secrets] = await Promise.all([getSettings(), getSecrets()]);
+        const reply = await chatWithTranscript({
+          transcript: msg.transcript,
+          history: msg.history,
+          question: msg.question,
+          llm,
+          apiKey: secrets.llmApiKey,
+        });
+        return { ok: true, reply };
+      } finally {
+        stop();
+      }
+    }
+
     case 'GET_JOB':
       return { ok: true, job: await getJob() };
 
@@ -104,6 +121,27 @@ async function handle(msg: BackgroundRequest): Promise<unknown> {
       return { ok: true, path };
     }
 
+    case 'SAVE_TRANSCRIPT': {
+      const { transcript } = msg;
+      const [{ obsidian }, secrets] = await Promise.all([getSettings(), getSecrets()]);
+      const suffix = '-transcript';
+      const paths = buildNotePaths(transcript.meta, obsidian.baseFolder, suffix);
+      const note = buildTranscriptNote(transcript.meta, transcript.text, paths);
+      const path =
+        msg.mode === 'rest'
+          ? await saveToObsidian(obsidian, secrets.obsidianApiKey, transcript.meta, note, suffix)
+          : await downloadNote(transcript.meta, note, suffix);
+      await addHistory({
+        course: transcript.meta.course,
+        lecture: `${transcript.meta.lecture} (字幕)`,
+        url: transcript.meta.url,
+        time: Date.now(),
+        status: 'saved',
+        path,
+      });
+      return { ok: true, path };
+    }
+
     case 'TEST_LLM': {
       const [{ llm }, secrets] = await Promise.all([getSettings(), getSecrets()]);
       const reply = await chat(llm, secrets.llmApiKey, '请只回复两个字：成功', 16);
@@ -114,6 +152,9 @@ async function handle(msg: BackgroundRequest): Promise<unknown> {
       const [{ obsidian }, secrets] = await Promise.all([getSettings(), getSecrets()]);
       return { ok: true, message: await testObsidian(obsidian, secrets.obsidianApiKey) };
     }
+
+    default:
+      return { ok: false, error: `未知的请求类型：${(msg as { type?: string })?.type ?? 'unknown'}` };
   }
 }
 

@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS } from './config';
-import type { HistoryEntry, Job, Secrets, SyncSettings } from './types';
+import type { ChatTurn, HistoryEntry, Job, Secrets, SyncSettings, Transcript } from './types';
 
 const HISTORY_LIMIT = 100;
 
@@ -44,4 +44,33 @@ export async function addHistory(entry: HistoryEntry): Promise<void> {
 export async function getHistory(): Promise<HistoryEntry[]> {
   const { history = [] } = (await chrome.storage.local.get('history')) as { history?: HistoryEntry[] };
   return history;
+}
+
+export interface ChatSession {
+  transcript?: Transcript;
+  turns: ChatTurn[];
+}
+
+function sessionKey(url: string): string {
+  const cleanUrl = url ? url.split('?')[0].split('#')[0] : 'default';
+  return `chat_session:${cleanUrl}`;
+}
+
+export async function getChatSession(url: string): Promise<ChatSession> {
+  const key = sessionKey(url);
+  const data = (await chrome.storage.session.get([key, 'chat_session:latest'])) as Record<
+    string,
+    ChatSession | undefined
+  >;
+  return data[key] ?? data['chat_session:latest'] ?? { turns: [] };
+}
+
+export async function saveChatSession(url: string, session: ChatSession): Promise<void> {
+  const key = sessionKey(url);
+  await chrome.storage.session.set({ [key]: session, 'chat_session:latest': session });
+}
+
+export async function clearChatSession(url: string): Promise<void> {
+  const key = sessionKey(url);
+  await chrome.storage.session.remove([key, 'chat_session:latest']);
 }

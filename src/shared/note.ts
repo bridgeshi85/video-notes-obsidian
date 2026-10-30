@@ -19,12 +19,13 @@ export interface NotePaths {
   mocPath: string;
 }
 
-export function buildNotePaths(meta: LectureMeta, baseFolder: string): NotePaths {
+export function buildNotePaths(meta: LectureMeta, baseFolder: string, suffix = ''): NotePaths {
   const base = baseFolder.replace(/^\/+|\/+$/g, '');
   const course = sanitizeFileName(meta.course);
   const folder = base ? `${base}/${course}` : course;
   const lecture = sanitizeFileName(meta.lecture);
-  const noteName = meta.index ? `${meta.index}-${lecture}` : lecture;
+  const baseName = meta.index ? `${meta.index}-${lecture}` : lecture;
+  const noteName = `${baseName}${suffix}`;
   const mocName = `${course} MOC`;
   return {
     folder,
@@ -59,7 +60,7 @@ export function normalizeLlmBody(body: string): string {
   return text.replace(/^#\s+.*\n+/, '').trim();
 }
 
-export function buildNote(meta: LectureMeta, body: string, paths: NotePaths, date = new Date()): string {
+export function buildNote(meta: LectureMeta, body: string, transcript: string, paths: NotePaths, date = new Date()): string {
   const tags = ['udemy', toTag(meta.courseSlug)].filter(Boolean);
   const frontmatter = [
     '---',
@@ -79,6 +80,43 @@ export function buildNote(meta: LectureMeta, body: string, paths: NotePaths, dat
 # ${meta.course} — ${meta.lecture}
 
 ${normalizeLlmBody(body)}
+
+## 📜 原始字幕（清洗后）
+
+<details>
+<summary>展开课程字幕</summary>
+
+${transcript}
+
+</details>
+
+## 🔗 上下文
+课程：[[${paths.mocName}]]
+`;
+}
+
+export function buildTranscriptNote(meta: LectureMeta, transcript: string, paths: NotePaths, date = new Date()): string {
+  const tags = ['udemy', 'transcript', toTag(meta.courseSlug)].filter(Boolean);
+  const frontmatter = [
+    '---',
+    `date: ${formatDate(date)}`,
+    `course: ${yamlString(meta.course)}`,
+    `lecture: ${yamlString(meta.lecture)}`,
+    `instructor: ${yamlString(meta.instructor)}`,
+    `source: ${yamlString(meta.url)}`,
+    `duration: ${yamlString(meta.duration)}`,
+    `tags: [${tags.join(', ')}]`,
+    'type: video-transcript',
+    '---',
+  ].join('\n');
+
+  return `${frontmatter}
+
+# ${meta.course} — ${meta.lecture}
+
+## 📜 课程字幕
+
+${transcript}
 
 ## 🔗 上下文
 课程：[[${paths.mocName}]]

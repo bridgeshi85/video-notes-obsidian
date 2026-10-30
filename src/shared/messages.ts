@@ -1,15 +1,17 @@
-import type { Job, Transcript } from './types';
+import type { ChatTurn, Job, Transcript } from './types';
 
-/** popup → content script */
+/** popup / sidepanel → content script */
 export type ContentRequest = { type: 'EXTRACT' } | { type: 'GET_META' };
 
 export type ExtractResponse =
   | { ok: true; transcript: Transcript }
   | { ok: false; error: string };
 
-/** popup → background */
+/** popup / sidepanel → background */
 export type BackgroundRequest =
   | { type: 'GENERATE'; transcript: Transcript }
+  | { type: 'CHAT'; transcript: Transcript; history: ChatTurn[]; question: string }
+  | { type: 'SAVE_TRANSCRIPT'; transcript: Transcript; mode: 'rest' | 'download' }
   | { type: 'GET_JOB' }
   | { type: 'CLEAR_JOB' }
   | { type: 'CHECK_EXISTS' }

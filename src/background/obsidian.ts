@@ -59,8 +59,14 @@ export async function noteExists(cfg: ObsidianConfig, apiKey: string, meta: Lect
 }
 
 /** 写入笔记（覆盖）并在课程 MOC 中追加链接（已存在则跳过） */
-export async function saveToObsidian(cfg: ObsidianConfig, apiKey: string, meta: LectureMeta, note: string): Promise<string> {
-  const paths = buildNotePaths(meta, cfg.baseFolder);
+export async function saveToObsidian(
+  cfg: ObsidianConfig,
+  apiKey: string,
+  meta: LectureMeta,
+  note: string,
+  suffix = '',
+): Promise<string> {
+  const paths = buildNotePaths(meta, cfg.baseFolder, suffix);
 
   const put = await request(cfg, apiKey, 'PUT', `/vault/${encodeVaultPath(paths.notePath)}`, note);
   await ensureOk(put, '写入笔记');
@@ -87,8 +93,8 @@ export async function testObsidian(cfg: ObsidianConfig, apiKey: string): Promise
 }
 
 /** 降级方案：通过 chrome.downloads 下载 .md 到默认下载目录 */
-export async function downloadNote(meta: LectureMeta, note: string): Promise<string> {
-  const paths = buildNotePaths(meta, 'VideoNotes/Udemy');
+export async function downloadNote(meta: LectureMeta, note: string, suffix = ''): Promise<string> {
+  const paths = buildNotePaths(meta, 'VideoNotes/Udemy', suffix);
   const url = `data:text/markdown;charset=utf-8,${encodeURIComponent(note)}`;
   await chrome.downloads.download({ url, filename: paths.notePath, conflictAction: 'overwrite', saveAs: false });
   return `下载目录/${paths.notePath}`;

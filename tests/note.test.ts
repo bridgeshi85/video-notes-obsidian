@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderTemplate } from '../src/shared/config';
-import { buildMocContent, buildNote, buildNotePaths, mocLink, normalizeLlmBody, sanitizeFileName } from '../src/shared/note';
+import { buildMocContent, buildNote, buildNotePaths, buildTranscriptNote, mocLink, normalizeLlmBody, sanitizeFileName } from '../src/shared/note';
 import type { LectureMeta } from '../src/shared/types';
 
 const meta: LectureMeta = {
@@ -31,6 +31,12 @@ describe('buildNotePaths', () => {
   it('无序号时只用标题', () => {
     expect(buildNotePaths({ ...meta, index: '' }, 'X').noteName).toBe('Why use Docker');
   });
+
+  it('支持自定义后缀（如 -transcript）', () => {
+    const p = buildNotePaths(meta, 'VN', '-transcript');
+    expect(p.noteName).toBe('003-Why use Docker-transcript');
+    expect(p.notePath).toBe('VN/Docker & K8s The Complete Guide/003-Why use Docker-transcript.md');
+  });
 });
 
 describe('normalizeLlmBody', () => {
@@ -42,18 +48,30 @@ describe('normalizeLlmBody', () => {
 describe('buildNote', () => {
   it('生成 frontmatter + 正文 + MOC 链接', () => {
     const paths = buildNotePaths(meta, 'VN');
-    const note = buildNote(meta, '## 📝 核心总结\n总结', paths, new Date(2026, 9, 8));
+    const note = buildNote(meta, '## 📝 核心总结\n总结', 'First subtitle paragraph.\n\nSecond paragraph.', paths, new Date(2026, 9, 8));
     expect(note).toContain('date: 2026-10-08');
     expect(note).toContain('course: "Docker & K8s: The \\"Complete\\" Guide"');
     expect(note).toContain('tags: [udemy, docker-and-kubernetes]');
     expect(note).toContain('type: video-note');
     expect(note).toContain('# Docker & K8s: The "Complete" Guide — Why use Docker?');
     expect(note).toContain('## 📝 核心总结\n总结');
+    expect(note).toContain('## 📜 原始字幕（清洗后）\n\n<details>\n<summary>展开课程字幕</summary>\n\nFirst subtitle paragraph.\n\nSecond paragraph.\n\n</details>');
     expect(note.trimEnd().endsWith('课程：[[Docker & K8s The Complete Guide MOC]]')).toBe(true);
   });
 
   it('MOC 模板', () => {
     expect(buildMocContent(meta)).toContain('# Docker & K8s: The "Complete" Guide MOC');
+  });
+
+  it('生成纯字幕笔记（无需 AI 总结）', () => {
+    const paths = buildNotePaths(meta, 'VN', '-transcript');
+    const note = buildTranscriptNote(meta, 'Line 1.\n\nLine 2.', paths, new Date(2026, 9, 8));
+    expect(note).toContain('date: 2026-10-08');
+    expect(note).toContain('type: video-transcript');
+    expect(note).toContain('tags: [udemy, transcript, docker-and-kubernetes]');
+    expect(note).toContain('# Docker & K8s: The "Complete" Guide — Why use Docker?');
+    expect(note).toContain('## 📜 课程字幕\n\nLine 1.\n\nLine 2.');
+    expect(note.trimEnd().endsWith('课程：[[Docker & K8s The Complete Guide MOC]]')).toBe(true);
   });
 });
 

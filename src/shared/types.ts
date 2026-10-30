@@ -88,3 +88,15 @@ export interface HistoryEntry {
   status: 'generated' | 'saved' | 'error';
   path?: string;
 }
+
+export interface ChatTurn {
+  role: 'user' | 'assistant';
+  content: string;
+  /** 若为总结笔记消息，标记以便展示保存/下载按钮 */
+  isNote?: boolean;
+}
+
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}

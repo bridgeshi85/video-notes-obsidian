@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Video Notes 对话</title>
+    <link rel="stylesheet" href="../shared/ui.css" />
+    <link rel="stylesheet" href="./sidepanel.css" />
+  </head>
+  <body>
+    <header class="top-bar">
+      <div class="row">
+        <h1>💬 课程对话</h1>
+        <span class="spacer"></span>
+        <button id="open-options" class="btn-sm" title="设置">⚙️ 设置</button>
+      </div>
+      <div id="lecture-bar" class="lecture-info muted">尚未加载字幕</div>
+      <div class="row toolbar">
+        <button id="btn-extract" class="btn-sm">📥 提取字幕</button>
+        <label for="file-input" class="btn-label btn-sm">📂 上传 .vtt/.srt</label>
+        <input id="file-input" type="file" accept=".vtt,.srt,text/vtt" hidden />
+        <button id="btn-download-transcript" class="btn-sm" disabled>⬇️ 下载字幕 .md</button>
+        <button id="btn-save-transcript" class="btn-sm hidden" disabled>💾 存字幕</button>
+      </div>
+    </header>
+
+    <div id="config-warning" class="msg warn hidden">
+      尚未配置 LLM API Key。<a href="#" id="config-link">前往设置</a>
+    </div>
+    <div id="message" class="msg hidden"></div>
+
+    <!-- 生成进度条 -->
+    <div id="job-progress" class="job-progress hidden">
+      <div class="row">
+        <span class="spinner"></span>
+        <span id="progress-text" class="muted">正在生成笔记…</span>
+      </div>
+      <progress id="progress-bar" max="1" value="0"></progress>
+    </div>
+
+    <!-- 聊天气泡列表 -->
+    <main id="chat-list" class="chat-list">
+      <div id="empty-state" class="empty-state muted">
+        请先点击上方「📥 提取字幕」或上传字幕文件，即可总结笔记或自由提问。
+      </div>
+    </main>
+
+    <!-- 底部操作与输入框 -->
+    <footer class="chat-footer">
+      <div class="row quick-actions">
+        <button id="btn-summarize" class="btn-sm primary" disabled>✨ 总结笔记</button>
+        <span class="spacer"></span>
+        <button id="btn-clear" class="btn-sm">🗑️ 清空对话</button>
+      </div>
+      <div class="input-row">
+        <textarea
+          id="chat-input"
+          rows="2"
+          placeholder="围绕当前字幕提问（Enter 发送，Shift+Enter 换行）…"
+          disabled
+        ></textarea>
+        <button id="btn-send" class="primary" disabled>发送</button>
+      </div>
+    </footer>
+
+    <script type="module" src="./sidepanel.ts"></script>
+  </body>
+</html>
