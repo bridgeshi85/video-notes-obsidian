@@ -1,5 +1,6 @@
 import { cleanTranscript, countChars } from '../shared/clean';
 import { getPreset } from '../shared/config';
+import { renderMarkdown } from '../shared/markdown';
 import type { BackgroundRequest, Broadcast, ContentRequest, ExtractResponse } from '../shared/messages';
 import { buildNotePaths, buildTranscriptNote } from '../shared/note';
 import {
@@ -64,6 +65,7 @@ async function persistSession() {
 
 function updateControls() {
   const hasTranscript = !!transcript;
+  $<HTMLButtonElement>('btn-copy-transcript').disabled = !hasTranscript;
   $<HTMLButtonElement>('btn-download-transcript').disabled = !hasTranscript;
   $<HTMLButtonElement>('btn-save-transcript').disabled = !hasTranscript;
   $<HTMLButtonElement>('btn-summarize').disabled = !hasTranscript || asking;
@@ -146,7 +148,16 @@ function renderTurns() {
 
     const content = document.createElement('div');
     content.className = 'bubble-content';
-    content.textContent = turn.content;
+    if (turn.role === 'assistant') {
+      content.classList.add('markdown-body');
+      content.innerHTML = renderMarkdown(turn.content);
+      for (const link of content.querySelectorAll('a[href]')) {
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+      }
+    } else {
+      content.textContent = turn.content;
+    }
     item.appendChild(content);
 
     if (turn.role === 'assistant') {
@@ -264,6 +275,17 @@ async function handleSubtitleFile(file: File) {
   await persistSession();
   updateControls();
   renderTurns();
+}
+
+async function copyTranscript() {
+  if (!transcript) return;
+  clearMessage();
+  try {
+    await navigator.clipboard.writeText(transcript.text);
+    message('字幕已复制到剪贴板', 'ok');
+  } catch {
+    message('复制失败，请确认浏览器允许访问剪贴板后重试。');
+  }
 }
 
 async function saveTranscript(mode: 'rest' | 'download') {
@@ -398,6 +420,7 @@ function bindEvents() {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (file) void handleSubtitleFile(file);
   });
+  $('btn-copy-transcript').addEventListener('click', () => void copyTranscript());
   $('btn-download-transcript').addEventListener('click', () => void saveTranscript('download'));
   $('btn-save-transcript').addEventListener('click', () => void saveTranscript('rest'));
   $('btn-summarize').addEventListener('click', () => void summarize());

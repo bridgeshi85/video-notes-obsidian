@@ -78,6 +78,7 @@ body {
 }
 
 .bubble {
+  min-width: 0;
   max-width: 92%;
   padding: 8px 12px;
   border-radius: var(--radius);
@@ -103,6 +104,68 @@ body {
   white-space: pre-wrap;
   font-size: 13px;
 }
+
+.markdown-body {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.markdown-body > :first-child { margin-top: 0; }
+.markdown-body > :last-child { margin-bottom: 0; }
+.markdown-body p, .markdown-body ul, .markdown-body ol,
+.markdown-body blockquote, .markdown-body pre, .markdown-body table {
+  margin: 0 0 10px;
+}
+.markdown-body h1, .markdown-body h2, .markdown-body h3,
+.markdown-body h4, .markdown-body h5, .markdown-body h6 {
+  margin: 16px 0 8px;
+  line-height: 1.35;
+}
+.markdown-body h1 { font-size: 20px; }
+.markdown-body h2 { font-size: 17px; }
+.markdown-body h3 { font-size: 15px; }
+.markdown-body h4, .markdown-body h5, .markdown-body h6 { font-size: 13px; }
+.markdown-body ul, .markdown-body ol { padding-left: 22px; }
+.markdown-body li + li { margin-top: 4px; }
+.markdown-body li > p { margin-bottom: 4px; }
+.markdown-body li > ul, .markdown-body li > ol { margin-bottom: 0; }
+.markdown-body blockquote {
+  margin-left: 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+.markdown-body blockquote > :last-child { margin-bottom: 0; }
+.markdown-body code {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg);
+}
+.markdown-body pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.markdown-body pre code { padding: 0; background: none; }
+.markdown-body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.markdown-body th, .markdown-body td {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+}
+.markdown-body a { color: var(--accent); }
+.markdown-body hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 
 .bubble-actions {
   margin-top: 8px;

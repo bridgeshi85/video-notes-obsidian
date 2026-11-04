@@ -277,8 +277,13 @@ async function save(mode: 'rest' | 'download', skipExistCheck = false) {
 }
 
 async function copy(text: string) {
-  await navigator.clipboard.writeText(text);
-  message('已复制到剪贴板', 'ok');
+  clearMessage();
+  try {
+    await navigator.clipboard.writeText(text);
+    message('已复制到剪贴板', 'ok');
+  } catch {
+    message('复制失败，请确认浏览器允许访问剪贴板后重试。');
+  }
 }
 
 // ---------- 初始化 ----------
@@ -323,6 +328,9 @@ function bindEvents() {
   });
 
   $('btn-generate').addEventListener('click', () => void generate());
+  $('btn-copy-transcript').addEventListener('click', () => {
+    if (transcript) void copy(transcript.text);
+  });
   $('btn-download-transcript').addEventListener('click', () => void saveTranscript('download'));
   $('btn-save-transcript').addEventListener('click', () => void saveTranscript('rest'));
   $('btn-reextract').addEventListener('click', () => void extractFromPage());
