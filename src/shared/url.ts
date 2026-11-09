@@ -1,14 +1,28 @@
+import type { Platform } from './types';
+
 /** 页面 URL 识别（popup / sidepanel / storage 共用） */
+export function detectPlatform(url?: string): Platform | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+    if (/(^|\.)udemy\.com$/.test(u.hostname) && /^\/course\/[^/]+\/learn\//.test(u.pathname)) return 'udemy';
+    if (u.hostname === 'www.youtube.com' && u.pathname === '/watch' && u.searchParams.get('v')) return 'youtube';
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 export function isUdemyLearnUrl(url?: string): boolean {
-  return !!url && /^https?:\/\/[^/]*udemy\.com\/course\/[^/]+\/learn\//.test(url);
+  return detectPlatform(url) === 'udemy';
 }
 
 export function youtubeVideoId(url?: string): string {
   if (!url) return '';
   try {
     const u = new URL(url);
-    if (!/(^|\.)youtube\.com$/.test(u.hostname) || u.pathname !== '/watch') return '';
+    if (detectPlatform(url) !== 'youtube') return '';
     return u.searchParams.get('v') ?? '';
   } catch {
     return '';
@@ -20,7 +34,7 @@ export function isYouTubeWatchUrl(url?: string): boolean {
 }
 
 export function isSupportedUrl(url?: string): boolean {
-  return isUdemyLearnUrl(url) || isYouTubeWatchUrl(url);
+  return detectPlatform(url) !== null;
 }
 
 /** 会话 key 用的规范化 URL：YouTube 只保留 v（忽略 t / list 等参数），其它去掉 query 与 hash */

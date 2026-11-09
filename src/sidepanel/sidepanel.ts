@@ -52,10 +52,11 @@ async function send<T = Record<string, unknown>>(
 async function getActiveTab(): Promise<chrome.tabs.Tab | undefined> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab && isSupportedUrl(tab.url)) return tab;
+  // 正常浏览网页时不偷偷选取另一个平台的标签页；仅独立面板标签页需要回退。
+  if (tab?.url && !tab.url.startsWith(chrome.runtime.getURL('src/sidepanel/index.html'))) return tab;
   const allTabs = await chrome.tabs.query({ currentWindow: true });
   return allTabs.find((t) => isSupportedUrl(t.url)) ?? tab;
 }
-
 
 async function persistSession() {
   await saveChatSession(currentUrlKey, { transcript, turns });

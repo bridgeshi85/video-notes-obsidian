@@ -4,7 +4,7 @@ import type { BackgroundRequest, Broadcast, ContentRequest, ExtractResponse } fr
 import { buildNotePaths, buildTranscriptNote } from '../shared/note';
 import { addHistory, getChatSession, getSecrets, getSettings, saveChatSession } from '../shared/storage';
 import type { Job, LectureMeta, SyncSettings, Transcript } from '../shared/types';
-import { isSupportedUrl, UNSUPPORTED_PAGE_HINT } from '../shared/url';
+import { isSupportedUrl, normalizeVideoUrl, UNSUPPORTED_PAGE_HINT } from '../shared/url';
 import { parseSubtitleLines } from '../shared/vtt';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -387,7 +387,7 @@ async function init() {
   activeTabUrl = tab?.url;
 
   const res = await send<{ job?: Job }>({ type: 'GET_JOB' });
-  if (res.ok && res.job) {
+  if (res.ok && res.job && (!isSupportedUrl(tab?.url) || normalizeVideoUrl(res.job.meta.url) === normalizeVideoUrl(tab!.url!))) {
     renderJob(res.job);
     return;
   }

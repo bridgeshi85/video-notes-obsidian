@@ -63,7 +63,13 @@ export async function getChatSession(url: string): Promise<ChatSession> {
     string,
     ChatSession | undefined
   >;
-  return data[key] ?? data['chat_session:latest'] ?? { turns: [] };
+  const latest = data['chat_session:latest'];
+  if (data[key]) return data[key];
+  // 仅默认入口或同一视频可以恢复最近会话，不能跨平台/视频复用字幕。
+  if (!url || url === 'default' || (latest?.transcript?.meta.url && normalizeVideoUrl(latest.transcript.meta.url) === normalizeVideoUrl(url))) {
+    return latest ?? { turns: [] };
+  }
+  return { turns: [] };
 }
 
 export async function saveChatSession(url: string, session: ChatSession): Promise<void> {
