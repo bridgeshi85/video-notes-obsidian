@@ -17,9 +17,29 @@ export interface NotePaths {
   notePath: string;
   mocName: string;
   mocPath: string;
+  /** false 时不创建/追加 MOC，笔记也不含 MOC 链接（YouTube） */
+  hasMoc: boolean;
+}
+
+export function isYouTube(meta: LectureMeta): boolean {
+  return meta.platform === 'youtube';
+}
+
+/** YouTube 笔记目录：baseFolder 的上级目录 + /YouTube（默认 素材库/VideoNotes/YouTube），平铺不分频道 */
+function youtubeFolder(baseFolder: string): string {
+  const base = baseFolder.replace(/^\/+|\/+$/g, '');
+  const idx = base.lastIndexOf('/');
+  return idx > 0 ? `${base.slice(0, idx)}/YouTube` : 'YouTube';
 }
 
 export function buildNotePaths(meta: LectureMeta, baseFolder: string, suffix = ''): NotePaths {
+  if (isYouTube(meta)) {
+    const folder = youtubeFolder(baseFolder);
+    const title = sanitizeFileName(meta.lecture);
+    const id = (meta.videoId ?? '').slice(0, 6);
+    const noteName = `${id ? `${title}-${id}` : title}${suffix}`;
+    return { folder, noteName, notePath: `${folder}/${noteName}.md`, mocName: '', mocPath: '', hasMoc: false };
+  }
   const base = baseFolder.replace(/^\/+|\/+$/g, '');
   const course = sanitizeFileName(meta.course);
   const folder = base ? `${base}/${course}` : course;
@@ -33,6 +53,7 @@ export function buildNotePaths(meta: LectureMeta, baseFolder: string, suffix = '
     notePath: `${folder}/${noteName}.md`,
     mocName,
     mocPath: `${folder}/${mocName}.md`,
+    hasMoc: true,
   };
 }
 
@@ -60,67 +81,67 @@ export function normalizeLlmBody(body: string): string {
   return text.replace(/^#\s+.*\n+/, '').trim();
 }
 
-export function buildNote(meta: LectureMeta, body: string, transcript: string, paths: NotePaths, date = new Date()): string {
-  const tags = ['udemy', toTag(meta.courseSlug)].filter(Boolean);
-  const frontmatter = [
+function buildFrontmatter(meta: LectureMeta, type: string, extraTags: string[], date: Date): string {
+  const yt = isYouTube(meta);
+  const tags = [yt ? 'youtube' : 'udemy', ...extraTags, toTag(meta.courseSlug)].filter(Boolean);
+  const lines = yt
+    ? [
+        `channel: ${yamlString(meta.course)}`,
+        `title: ${yamlString(meta.lecture)}`,
+        ...(meta.videoId ? [`video_id: ${yamlString(meta.videoId)}`] : []),
+      ]
+    : [`course: ${yamlString(meta.course)}`, `lecture: ${yamlString(meta.lecture)}`, `instructor: ${yamlString(meta.instructor)}`];
+  return [
     '---',
     `date: ${formatDate(date)}`,
-    `course: ${yamlString(meta.course)}`,
-    `lecture: ${yamlString(meta.lecture)}`,
-    `instructor: ${yamlString(meta.instructor)}`,
+    ...lines,
     `source: ${yamlString(meta.url)}`,
     `duration: ${yamlString(meta.duration)}`,
     `tags: [${tags.join(', ')}]`,
-    'type: video-note',
+    `type: ${type}`,
     '---',
   ].join('\n');
+}
 
-  return `${frontmatter}
+function heading(meta: LectureMeta): string {
+  return isYouTube(meta) ? `# ${meta.lecture}` : `# ${meta.course} — ${meta.lecture}`;
+}
 
-# ${meta.course} — ${meta.lecture}
+function contextSection(meta: LectureMeta, paths: NotePaths): string {
+  if (paths.hasMoc) return `\n## 🔗 上下文\n课程：[[${paths.mocName}]]\n`;
+  if (isYouTube(meta)) return `\n## 🔗 上下文\n频道：${meta.course}\n视频：${meta.url}\n`;
+  return '';
+}
+
+export function buildNote(meta: LectureMeta, body: string, transcript: string, paths: NotePaths, date = new Date()): string {
+  const label = isYouTube(meta) ? '视频' : '课程';
+  return `${buildFrontmatter(meta, 'video-note', [], date)}
+
+${heading(meta)}
 
 ${normalizeLlmBody(body)}
 
 ## 📜 原始字幕（清洗后）
 
 <details>
-<summary>展开课程字幕</summary>
+<summary>展开${label}字幕</summary>
 
 ${transcript}
 
 </details>
-
-## 🔗 上下文
-课程：[[${paths.mocName}]]
-`;
+${contextSection(meta, paths)}`;
 }
 
 export function buildTranscriptNote(meta: LectureMeta, transcript: string, paths: NotePaths, date = new Date()): string {
-  const tags = ['udemy', 'transcript', toTag(meta.courseSlug)].filter(Boolean);
-  const frontmatter = [
-    '---',
-    `date: ${formatDate(date)}`,
-    `course: ${yamlString(meta.course)}`,
-    `lecture: ${yamlString(meta.lecture)}`,
-    `instructor: ${yamlString(meta.instructor)}`,
-    `source: ${yamlString(meta.url)}`,
-    `duration: ${yamlString(meta.duration)}`,
-    `tags: [${tags.join(', ')}]`,
-    'type: video-transcript',
-    '---',
-  ].join('\n');
+  const label = isYouTube(meta) ? '视频' : '课程';
+  return `${buildFrontmatter(meta, 'video-transcript', ['transcript'], date)}
 
-  return `${frontmatter}
+${heading(meta)}
 
-# ${meta.course} — ${meta.lecture}
-
-## 📜 课程字幕
+## 📜 ${label}字幕
 
 ${transcript}
-
-## 🔗 上下文
-课程：[[${paths.mocName}]]
-`;
+${contextSection(meta, paths)}`;
 }
 
 export function buildMocContent(meta: LectureMeta): string {

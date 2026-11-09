@@ -52,13 +52,13 @@ export function getPreset(id: ProviderId): ProviderPreset {
   return PROVIDER_PRESETS.find((p) => p.id === id) ?? PROVIDER_PRESETS[0];
 }
 
-export const DEFAULT_MAP_PROMPT = `你是一名技术课程笔记助手。下面是视频课程《{{course}}》中「{{lecture}}」一节字幕的第 {{part}}/{{total}} 段。
+export const DEFAULT_MAP_PROMPT = `你是一名技术视频笔记助手。下面是{{source}}字幕的第 {{part}}/{{total}} 段。
 
 请从这段字幕中提取：
 1. 关键要点与核心概念（含必要解释）
 2. 出现的代码、命令、配置（原样保留，使用代码块）
 3. 实战步骤或操作流程
-4. 讲师强调的注意事项、坑点
+4. 讲师/作者强调的注意事项、坑点
 
 要求：
 - 只输出要点列表，不要寒暄、不要总结全文
@@ -70,18 +70,18 @@ export const DEFAULT_MAP_PROMPT = `你是一名技术课程笔记助手。下面
 {{content}}
 """`;
 
-export const DEFAULT_REDUCE_PROMPT = `你是一名技术课程笔记助手。下面是视频课程《{{course}}》中「{{lecture}}」一节的{{inputKind}}。
+export const DEFAULT_REDUCE_PROMPT = `你是一名技术视频笔记助手。下面是{{source}}的{{inputKind}}。
 
 请整理成一篇中文结构化学习笔记，严格按以下 Markdown 结构输出（只输出这三个二级标题及其内容，不要输出一级标题、frontmatter 或其他额外内容）：
 
 ## 📝 核心总结
-用 3-5 句话概括本节的核心内容。
+用 3-5 句话概括本视频的核心内容。
 
 ## 🎯 关键要点
 - 以列表形式列出关键概念与知识点，每条一句话说清楚，必要时附简短解释
 
 ## 💡 实战细节
-本节涉及的代码、命令、配置、操作步骤（代码使用带语言标注的代码块）。若本节没有实战内容，写"本节无实战内容"。
+视频涉及的代码、命令、配置、操作步骤（代码使用带语言标注的代码块）。若没有实战内容，写"无实战内容"。
 
 要求：
 - 字幕可能来自自动语音识别，请修正明显的识别错误（尤其是技术术语）
@@ -118,6 +118,13 @@ export const DEFAULT_SETTINGS: SyncSettings = {
   obsidian: DEFAULT_OBSIDIAN,
   prompts: DEFAULT_PROMPTS,
 };
+
+/** 模板变量 {{source}}：对内容来源的自然语言描述 */
+export function describeSource(meta: { platform?: string; course: string; lecture: string }): string {
+  return meta.platform === 'youtube'
+    ? `YouTube 频道「${meta.course}」的视频「${meta.lecture}」`
+    : `视频课程《${meta.course}》中「${meta.lecture}」一节`;
+}
 
 /** 简单模板渲染：{{key}} → vars[key] */
 export function renderTemplate(tpl: string, vars: Record<string, string | number>): string {

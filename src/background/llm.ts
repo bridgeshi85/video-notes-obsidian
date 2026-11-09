@@ -1,5 +1,5 @@
 import { splitIntoChunks } from '../shared/chunk';
-import { renderTemplate } from '../shared/config';
+import { describeSource, renderTemplate } from '../shared/config';
 import type { ChatMessage, ChatTurn, LectureMeta, LlmConfig, PromptConfig, Transcript } from '../shared/types';
 
 const REQUEST_TIMEOUT_MS = 180_000;
@@ -147,7 +147,7 @@ export async function generateNoteBody(input: GenerateInput, onProgress: (p: Pro
   const { meta, text, llm, prompts, apiKey } = input;
   const chunks = splitIntoChunks(text, llm.chunkTokens);
   const total = chunks.length === 1 ? 1 : chunks.length + 1;
-  const base = { course: meta.course, lecture: meta.lecture };
+  const base = { course: meta.course, lecture: meta.lecture, source: describeSource(meta) };
 
   if (chunks.length === 1) {
     onProgress({ stage: 'reduce', done: 0, total });
@@ -205,10 +205,11 @@ export async function chatWithTranscript(input: ChatWithTranscriptInput): Promis
 
   const systemContent = [
     SYSTEM_PROMPT,
-    '请围绕以下课程字幕回答用户的问题。如果问题超出字幕范围，可结合你的专业知识补充说明，但需注明哪些是课程原意、哪些是补充。',
-    `课程：${transcript.meta.course}`,
-    `小节：${transcript.meta.lecture}`,
-    `--- 课程字幕开始 ---\n${contextText}${truncatedHint}\n--- 课程字幕结束 ---`,
+    '请围绕以下视频字幕回答用户的问题。如果问题超出字幕范围，可结合你的专业知识补充说明，但需注明哪些是视频原意、哪些是补充。',
+    ...(transcript.meta.platform === 'youtube'
+      ? [`频道：${transcript.meta.course}`, `视频：${transcript.meta.lecture}`]
+      : [`课程：${transcript.meta.course}`, `小节：${transcript.meta.lecture}`]),
+    `--- 字幕开始 ---\n${contextText}${truncatedHint}\n--- 字幕结束 ---`,
   ].join('\n');
 
   const recentHistory = history.slice(-MAX_CHAT_HISTORY_TURNS).map<ChatMessage>((t) => ({

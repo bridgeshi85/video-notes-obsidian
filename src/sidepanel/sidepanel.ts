@@ -12,6 +12,7 @@ import {
   saveChatSession,
 } from '../shared/storage';
 import type { ChatTurn, Job, LectureMeta, SyncSettings, Transcript } from '../shared/types';
+import { isSupportedUrl, UNSUPPORTED_PAGE_HINT } from '../shared/url';
 import { parseSubtitleLines } from '../shared/vtt';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -50,14 +51,11 @@ async function send<T = Record<string, unknown>>(
 
 async function getActiveTab(): Promise<chrome.tabs.Tab | undefined> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab && isUdemyLearnUrl(tab.url)) return tab;
+  if (tab && isSupportedUrl(tab.url)) return tab;
   const allTabs = await chrome.tabs.query({ currentWindow: true });
-  return allTabs.find((t) => isUdemyLearnUrl(t.url)) ?? tab;
+  return allTabs.find((t) => isSupportedUrl(t.url)) ?? tab;
 }
 
-function isUdemyLearnUrl(url?: string): boolean {
-  return !!url && /^https?:\/\/[^/]*udemy\.com\/course\/[^/]+\/learn\//.test(url);
-}
 
 async function persistSession() {
   await saveChatSession(currentUrlKey, { transcript, turns });
@@ -204,8 +202,8 @@ async function extractFromPage() {
   clearMessage();
   const tab = await getActiveTab();
   activeTabId = tab?.id;
-  if (!tab?.id || !isUdemyLearnUrl(tab.url)) {
-    message('请在 Udemy 课程播放页使用「提取字幕」，或点击「上传 .vtt/.srt」。', 'warn');
+  if (!tab?.id || !isSupportedUrl(tab.url)) {
+    message(`${UNSUPPORTED_PAGE_HINT}「提取字幕」，或点击「上传 .vtt/.srt」。`, 'warn');
     return;
   }
 
@@ -214,7 +212,7 @@ async function extractFromPage() {
   try {
     res = await chrome.tabs.sendMessage<ContentRequest, ExtractResponse>(tab.id, { type: 'EXTRACT' });
   } catch {
-    message('无法连接页面脚本，请刷新 Udemy 页面后重试。');
+    message('无法连接页面脚本，请刷新页面后重试。');
     updateControls();
     return;
   }
@@ -464,7 +462,7 @@ async function init() {
   updateControls();
   renderTurns();
 
-  if (!transcript && tab?.id && isUdemyLearnUrl(tab.url)) {
+  if (!transcript && tab?.id && isSupportedUrl(tab.url)) {
     await extractFromPage();
   }
 }

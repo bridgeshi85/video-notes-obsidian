@@ -4,7 +4,7 @@ import pkg from './package.json';
 export default defineManifest({
   manifest_version: 3,
   name: 'Video Notes for Obsidian',
-  description: '提取 Udemy 课程字幕，用你自己的 LLM 生成中文结构化笔记，保存到 Obsidian。',
+  description: '提取 Udemy / YouTube 视频字幕，用你自己的 LLM 生成中文结构化笔记，保存到 Obsidian。',
   version: pkg.version,
   icons: {
     16: 'icons/icon16.png',
@@ -25,7 +25,8 @@ export default defineManifest({
   },
   content_scripts: [
     {
-      matches: ['*://*.udemy.com/course/*/learn/*'],
+      // YouTube 是 SPA：需匹配全站，以便站内跳转到 /watch 后脚本已就位
+      matches: ['*://*.udemy.com/course/*/learn/*', '*://www.youtube.com/*'],
       js: ['src/content/index.ts'],
       run_at: 'document_idle',
     },
@@ -33,6 +34,7 @@ export default defineManifest({
   permissions: ['storage', 'activeTab', 'downloads', 'sidePanel'],
   host_permissions: [
     '*://*.udemy.com/*',
+    '*://www.youtube.com/*',
     'http://localhost:11434/*',
     'http://127.0.0.1:11434/*',
     'https://127.0.0.1:27124/*',

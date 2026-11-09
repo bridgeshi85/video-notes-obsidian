@@ -1,5 +1,6 @@
 import { DEFAULT_SETTINGS } from './config';
 import type { ChatTurn, HistoryEntry, Job, Secrets, SyncSettings, Transcript } from './types';
+import { normalizeVideoUrl } from './url';
 
 const HISTORY_LIMIT = 100;
 
@@ -52,7 +53,7 @@ export interface ChatSession {
 }
 
 function sessionKey(url: string): string {
-  const cleanUrl = url ? url.split('?')[0].split('#')[0] : 'default';
+  const cleanUrl = url ? normalizeVideoUrl(url) : 'default';
   return `chat_session:${cleanUrl}`;
 }
 

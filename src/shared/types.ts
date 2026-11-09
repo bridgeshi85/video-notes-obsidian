@@ -1,5 +1,14 @@
-/** 当前 lecture 的元数据（content script 从页面读取） */
+export type Platform = 'udemy' | 'youtube';
+
+/**
+ * 当前视频的元数据（content script 从页面读取）。
+ * YouTube 映射：course=频道名，courseSlug=频道 handle，lecture=视频标题，index=''。
+ */
 export interface LectureMeta {
+  /** 缺省视为 'udemy'（兼容旧数据） */
+  platform?: Platform;
+  /** YouTube 视频 ID */
+  videoId?: string;
   course: string;
   /** 课程 URL slug，用作主题 tag */
   courseSlug: string;

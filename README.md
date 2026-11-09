@@ -40,11 +40,23 @@ npm test           # 单元测试（清洗 / VTT 解析 / 分块 / 笔记格式 
 
 没有 Transcript 的课程，可从其他渠道获取 `.vtt` / `.srt` 字幕，拖入 popup 底部的拖放区。
 
+### YouTube
+
+1. 打开视频页（`youtube.com/watch?v=...`）。
+2. 点击插件图标或打开侧边栏 →「提取字幕」：插件会自动展开描述区、点击「显示文字稿」面板读取字幕，读完后关闭面板。使用页面当前显示的字幕语言。
+3. 总结 / 对话问答 / 保存与 Udemy 一致。
+4. 笔记平铺保存在「基础目录」的同级 `YouTube/` 目录下（默认 `素材库/VideoNotes/YouTube/`），文件名为 `<标题>-<视频ID前6位>.md`，**不生成 MOC**。frontmatter 使用 `channel` / `title` / `video_id`，标签为 `youtube`。
+
+注意：
+- 视频没有字幕/文字稿时会提示「该视频没有字幕」，可自行准备 `.vtt` / `.srt` 上传。
+- 暂不支持 Shorts、直播。
+- 对话问答只把前 `chunkTokens × 2` 的字幕放入上下文；长视频提问超出范围时可能不准确（总结使用 map-reduce，不受影响）。
+
 ## 目录结构
 
 ```
 src/
-├── content/      # Udemy 页面脚本：selectors.ts 集中管理选择器，index.ts 提取字幕与元数据
+├── content/      # 页面脚本：index.ts 按域名分发到 udemy.ts / youtube.ts；选择器在 selectors.ts / youtube-selectors.ts
 ├── background/   # service worker：llm.ts（重试/退避/map-reduce）、obsidian.ts（REST API / 下载）
 ├── popup/        # 主交互：预览 → 生成 → 保存
 ├── options/      # 设置页：LLM / Obsidian / Prompt 模板 / 历史
@@ -52,6 +64,6 @@ src/
 tests/            # vitest 单元测试
 ```
 
-## Udemy 改版怎么办
+## Udemy / YouTube 改版怎么办
 
-提取失败时 popup 会给出明确报错。所有选择器在 [src/content/selectors.ts](src/content/selectors.ts)，每项是按顺序尝试的候选列表，改这一个文件即可。
+提取失败时 popup 会给出明确报错。所有选择器在 [src/content/selectors.ts](src/content/selectors.ts)，每项是按顺序尝试的候选列表，改这一个文件即可。YouTube 选择器在 [src/content/youtube-selectors.ts](src/content/youtube-selectors.ts)（只依赖标签/结构，不依赖界面语言文案）。

@@ -71,6 +71,8 @@ export async function saveToObsidian(
   const put = await request(cfg, apiKey, 'PUT', `/vault/${encodeVaultPath(paths.notePath)}`, note);
   await ensureOk(put, '写入笔记');
 
+  if (!paths.hasMoc) return paths.notePath;
+
   const link = mocLink(paths);
   const moc = await readFile(cfg, apiKey, paths.mocPath);
   if (moc === null) {

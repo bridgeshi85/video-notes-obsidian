@@ -4,6 +4,7 @@ import type { BackgroundRequest, Broadcast, ContentRequest, ExtractResponse } fr
 import { buildNotePaths, buildTranscriptNote } from '../shared/note';
 import { addHistory, getChatSession, getSecrets, getSettings, saveChatSession } from '../shared/storage';
 import type { Job, LectureMeta, SyncSettings, Transcript } from '../shared/types';
+import { isSupportedUrl, UNSUPPORTED_PAGE_HINT } from '../shared/url';
 import { parseSubtitleLines } from '../shared/vtt';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -50,29 +51,25 @@ async function getActiveTab(): Promise<chrome.tabs.Tab | undefined> {
   return tab;
 }
 
-function isUdemyLearnUrl(url?: string): boolean {
-  return !!url && /^https?:\/\/[^/]*udemy\.com\/course\/[^/]+\/learn\//.test(url);
-}
-
 async function extractFromPage() {
   clearMessage();
   const tab = await getActiveTab();
   activeTabId = tab?.id;
   activeWindowId = tab?.windowId;
   activeTabUrl = tab?.url;
-  if (!tab?.id || !isUdemyLearnUrl(tab.url)) {
-    message('请在 Udemy 课程播放页使用本插件，或拖入 .vtt 字幕文件。', 'warn');
+  if (!tab?.id || !isSupportedUrl(tab.url)) {
+    message(`${UNSUPPORTED_PAGE_HINT}本插件，或拖入 .vtt 字幕文件。`, 'warn');
     show('view-drop');
     return;
   }
 
   show('view-loading', 'view-drop');
-  $('loading-text').textContent = '正在读取字幕（Transcript 较长时需要滚动加载，请稍候）…';
+  $('loading-text').textContent = '正在读取字幕（字幕较长时需要加载，请稍候）…';
   let res: ExtractResponse;
   try {
     res = await chrome.tabs.sendMessage<ContentRequest, ExtractResponse>(tab.id, { type: 'EXTRACT' });
   } catch {
-    message('无法连接页面脚本，请刷新 Udemy 页面后重试。');
+    message('无法连接页面脚本，请刷新页面后重试。');
     show('view-drop');
     return;
   }
