@@ -2,10 +2,9 @@ import { cleanTranscript, countChars } from '../shared/clean';
 import type { ExtractResponse } from '../shared/messages';
 import type { LectureMeta } from '../shared/types';
 import { formatDuration, sleep, text, waitFor } from './util';
-import { ytQuery, ytQueryAll } from './youtube-selectors';
+import { YT_SELECTORS, ytQuery, ytQueryAll } from './youtube-selectors';
 
 const PANEL_EXPANDED = 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED';
-const PANEL_HIDDEN = 'ENGAGEMENT_PANEL_VISIBILITY_HIDDEN';
 
 /** 最近一次由本脚本加载文字稿时对应的视频 ID（SPA 跳转后用于判断面板是否过期） */
 let loadedForVideoId: string | null = null;
@@ -49,18 +48,24 @@ export function readMeta(): LectureMeta {
 }
 
 function panelEl(): HTMLElement | null {
-  return ytQuery('transcriptPanel');
+  const panels = Array.from(document.querySelectorAll<HTMLElement>(YT_SELECTORS.transcriptPanel.join(', ')));
+  return panels.find(isPanelOpen) ?? panels[0] ?? null;
 }
 
 function isPanelOpen(panel: HTMLElement | null): boolean {
-  return !!panel && panel.getAttribute('visibility') === PANEL_EXPANDED;
+  if (!panel || panel.closest('[hidden], [aria-hidden="true"]')) return false;
+  const container = panel.closest('ytd-engagement-panel-section-list-renderer');
+  const visibility = container?.getAttribute('visibility');
+  if (visibility) return visibility === PANEL_EXPANDED;
+  return panel.matches('yt-section-list-renderer[panel-content-visible]')
+    || !!panel.querySelector('yt-section-list-renderer[data-target-id="PAmodern_transcript_view"][panel-content-visible]');
 }
 
 function closePanel(panel: HTMLElement | null): void {
   if (!panel) return;
-  const btn = ytQuery<HTMLElement>('panelClose', panel);
+  const container = panel.closest('ytd-engagement-panel-section-list-renderer') ?? panel;
+  const btn = ytQuery<HTMLElement>('panelClose', container);
   if (btn) btn.click();
-  else panel.setAttribute('visibility', PANEL_HIDDEN);
 }
 
 async function findTranscriptButton(): Promise<HTMLElement | null> {
@@ -85,7 +90,7 @@ async function collectSegments(panel: HTMLElement): Promise<string[]> {
   }
   const lines: string[] = [];
   for (const seg of ytQueryAll('segment', panel)) {
-    const t = text(ytQuery('segmentText', seg)) || text(seg);
+    const t = text(ytQuery('segmentText', seg));
     if (t) lines.push(t);
   }
   return lines;

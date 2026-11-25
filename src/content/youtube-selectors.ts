@@ -11,11 +11,12 @@ export const YT_SELECTORS = {
   /** 描述区展开按钮（文字稿按钮在折叠描述中可能未渲染） */
   descriptionExpand: ['ytd-watch-metadata #description-inline-expander #expand', 'tp-yt-paper-button#expand', '#expand'],
   transcriptPanel: [
+    'yt-section-list-renderer[data-target-id="PAmodern_transcript_view"]',
     'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]',
     'ytd-engagement-panel-section-list-renderer[target-id*="transcript"]',
   ],
   panelClose: ['#visibility-button button', '#visibility-button ytd-button-renderer', 'button[aria-label][class*="close" i]'],
-  segment: ['ytd-transcript-segment-renderer', 'transcript-segment-view-model'],
+  segment: ['ytd-transcript-segment-renderer, transcript-segment-view-model'],
   segmentText: ['.segment-text', 'yt-formatted-string', 'span[role="text"]'],
   title: ['h1.ytd-watch-metadata yt-formatted-string', 'ytd-watch-metadata h1', 'h1.title'],
   channelLink: ['ytd-watch-metadata ytd-channel-name#channel-name a', 'ytd-video-owner-renderer ytd-channel-name a', '#owner #channel-name a'],
